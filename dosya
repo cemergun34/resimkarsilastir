@@ -1,0 +1,87 @@
+#-*- coding: utf-8 -*-
+import os
+import shutil
+import sys
+import subprocess
+import glob
+import sqlite3, os
+from scipy.misc import imread
+from scipy.linalg import norm
+from scipy import sum, average
+import pdb
+
+sure=[]
+dosya=[]
+#def insertolustur(sure, dosya):
+#    ekle1="INSERT INTO SURELER VALUES"
+#    ekle2= " ([%s],""[%s]"")""" %(str(sure),str(dosya)
+def compare_images(img1, img2):
+    # normalize to compensate for exposure difference, this may be unnecessary
+    # consider disabling it
+    img1 = normalize(img1)
+    img2 = normalize(img2)
+    # calculate the difference and its norms
+    diff = img1 - img2  # elementwise for scipy arrays
+    m_norm = sum(abs(diff))  # Manhattan norm
+    z_norm = norm(diff.ravel(), 0)  # Zero norm
+    return (m_norm, z_norm)
+def to_grayscale(arr):
+    "If arr is a color image (3D array), convert it to grayscale (2D array)."
+    if len(arr.shape) == 3:
+        return average(arr, -1)  # average over the last axis (color channels)
+    else:
+        return arr
+def normalize(arr):
+    rng = arr.max()-arr.min()
+    amin = arr.min()
+    return (arr-amin)*255/rng
+def olustur():
+    cmd=['ffmpeg', '-i', 'SCREEN.mp4', '-an', '-f', 'image2', '-vf', 'fps=fps=1', "%0d.jpg"]
+    subprocess.call(cmd)
+
+files = sorted(glob.glob('*.JPG'))  # get *.JPG in a list (not sorted!)
+
+files = sorted(glob.glob('*.jpg'), key=os.path.getmtime)
+dosya = 'vt.sqlite'
+dosya_mevcut = os.path.exists(dosya)
+vt = sqlite3.connect(dosya)
+im = vt.cursor()
+#query satiri, degisim diye gecen farklı slaytları temsil eder
+
+im.execute("""CREATE TABLE IF NOT EXISTS sureler
+(id, sureler, degisim)""")
+vt.commit()
+#dosya mevcut ise harakete gec
+#sirano id karşılığındadır sure aynı zamanda
+sirano=0
+ilkjpg=""
+sonjpg=""
+degisim=0
+sonuc=len(files)
+if dosya_mevcut:
+    for listele in files:
+        #print listele, files[12], files[len(files)-1]
+        file1=listele
+        file2=files[sirano]
+        img1 = to_grayscale(imread(file1).astype(float))
+        img2 = to_grayscale(imread(file2).astype(float))
+        n_m, n_0 = compare_images(img1, img2)
+        #print "Manhattan norm:", n_m, "/ per pixel:", n_m/img1.size
+        #print "Zero norm:", n_0, "/ per pixel:", n_0*1.0/img1.size
+        per_pixel=n_m/img1.size
+        if per_pixel>4.2:print listele, files[sirano],"farkli"
+        print listele, files[sirano]
+        sirano=sirano+1
+
+        #print sirano, sure,"DOSYA ISMI="+ listele,dosyauzunluk
+        #sqlsatir="INSERT INTO sureler VALUES (%s,%s,%s)" % (sirano,sure,degisim)
+
+        #print ilkjpg,listele
+        #im.execute(sqlsatir)
+else:
+    print "dosya mevcut değildir"
+
+#im.execute("""SELECT * FROM sureler""")
+
+#veriler = im.fetchall()
+#print(veriler)
